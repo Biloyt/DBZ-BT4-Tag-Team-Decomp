@@ -1,0 +1,17 @@
+name: BT4 external character-pack checks
+on:
+  push:
+    branches:
+      - 'modding/**'
+  pull_request:
+  workflow_dispatch:
+jobs:
+  validate-pack-tool:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run character-package validator tests
+        run: python -m unittest discover -s tools/review/tests -p 'test_bt4_pack_validator.py' -v
