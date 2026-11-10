@@ -1,0 +1,43 @@
+name: BT4 native file alias prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [modding/character-pack-foundation]
+    paths:
+      - 'port/tools/bt4_patch_alias_runtime.py'
+      - 'tools/review/tests/test_bt4_patch_alias_runtime.py'
+      - '.github/workflows/bt4-native-alias-prototype.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-windows:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and apply the native alias integration
+        run: |
+          python3 -m unittest discover -s tools/review/tests -p test_bt4_patch_alias_runtime.py -v
+          python3 -m unittest discover -s tools/review/tests -p test_bt4_pack_validator.py -v
+          python3 port/tools/bt4_patch_alias_runtime.py --apply
+          python3 port/tools/bt4_patch_alias_runtime.py --check
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: port/release
+          tags: bt4-port-release:jammy
+          load: true
+      - name: Compile experimental BT4 Windows build (no game assets)
+        run: |
+          mkdir -p port/build
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src -w /src bt4-port-release:jammy \
+            sh port/release/inside.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bt4-native-alias-prototype-windows-x64
+          path: port/build/BT4decomp-windows-x64.zip
+          if-no-files-found: error
