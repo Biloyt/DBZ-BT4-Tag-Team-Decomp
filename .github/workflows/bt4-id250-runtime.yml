@@ -1,0 +1,46 @@
+name: BT4 ID250 runtime recognition prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [modding/character-pack-foundation]
+    paths:
+      - 'port/tools/bt4_patch_id250_runtime.py'
+      - 'tools/review/tests/test_bt4_patch_id250_runtime.py'
+      - '.github/workflows/bt4-id250-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-id250-preview:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source patch and run unit tests
+        run: |
+          python3 -m unittest discover -s tools/review/tests -p 'test_bt4_patch_id250_runtime.py' -v
+          python3 -m unittest discover -s tools/review/tests -p 'test_bt4_patch_alias_runtime.py' -v
+          python3 port/tools/bt4_patch_alias_runtime.py --apply
+          python3 port/tools/bt4_patch_alias_runtime.py --check
+          python3 port/tools/bt4_patch_id250_runtime.py --apply
+          python3 port/tools/bt4_patch_id250_runtime.py --check
+          git diff --check
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: port/release
+          tags: bt4-port-release:jammy
+          load: true
+      - name: Compile Windows executable with PC-only limit 251
+        run: |
+          mkdir -p port/build
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src -w /src bt4-port-release:jammy \
+            sh port/release/inside.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bt4-id250-runtime-preview-windows-x64
+          path: port/build/BT4decomp-windows-x64.zip
+          if-no-files-found: error
